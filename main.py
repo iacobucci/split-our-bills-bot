@@ -1,8 +1,6 @@
 #!/bin/python3
 
-import json
 import datetime
-from io import BytesIO
 
 from telethon import TelegramClient, events, Button
 from telethon.tl.functions.users import GetFullUserRequest
