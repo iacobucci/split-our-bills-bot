@@ -1,0 +1,6 @@
+sec.py
+.pytest_cache
+.venv
+__pycache__
+database.db
+bot.session
