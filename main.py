@@ -260,7 +260,7 @@ async def inline_handler(event):
 	
 	if amount > 0:
 		add_expense_article = builder.article(
-			title="Add an expense",
+			title="Add a WHOLE expense",
 			description=f"Click to add a WHOLE expense of {expense_amount_and_description(amount, description)}",
 			text=f"Adding new expense of {expense_amount_and_description(amount, description)}",
 			buttons=[
@@ -269,7 +269,7 @@ async def inline_handler(event):
 		)
 
 		add_split_expense_article = builder.article(
-			title="Add an expense",
+			title="Add a SPLIT expense",
 			description=f"Click to add a SPLIT expense of {expense_amount_and_description(amount, description)}",
 			text=f"Adding new expense of {expense_amount_and_description(amount/2, description)}",
 			buttons=[
