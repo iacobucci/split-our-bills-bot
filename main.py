@@ -270,7 +270,7 @@ async def inline_handler(event):
 
 		add_split_expense_article = builder.article(
 			title="Add a SPLIT expense",
-			description=f"Click to add a SPLIT expense of {expense_amount_and_description(amount, description)}, thus adding {format_currency(amount/2)} to {other_user_label}'s balance.",
+			description=f"Click to add a SPLIT expense of {expense_amount_and_description(amount, description)}, thus adding {format_currency(amount/2)} to {other_user_label}'s debt.",
 			text=f"Adding new expense of {expense_amount_and_description(amount/2, description)}",
 			buttons=[
 				Button.inline("Confirm", data=f"add_expense:::{amount/2}:::{user_id}:::{description}")
