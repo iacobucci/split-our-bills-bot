@@ -261,12 +261,22 @@ async def inline_handler(event):
 	if amount > 0:
 		add_expense_article = builder.article(
 			title="Add an expense",
-			description=f"Click to add a new expense of {expense_amount_and_description(amount, description)}",
+			description=f"Click to add a WHOLE expense of {expense_amount_and_description(amount, description)}",
 			text=f"Adding new expense of {expense_amount_and_description(amount, description)}",
 			buttons=[
 				Button.inline("Confirm", data=f"add_expense:::{amount}:::{user_id}:::{description}")
 			]
 		)
+
+		add_split_expense_article = builder.article(
+			title="Add an expense",
+			description=f"Click to add a SPLIT expense of {expense_amount_and_description(amount, description)}",
+			text=f"Adding new expense of {expense_amount_and_description(amount/2, description)}",
+			buttons=[
+				Button.inline("Confirm", data=f"add_expense:::{amount/2}:::{user_id}:::{description}")
+			]
+		)
+
 		await event.answer([add_expense_article] + balance_articles)
 	else:
 		await event.answer(balance_articles)
