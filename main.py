@@ -277,7 +277,7 @@ async def inline_handler(event):
 			]
 		)
 
-		await event.answer([add_expense_article] + balance_articles)
+		await event.answer([add_expense_article, add_split_expense_article] + balance_articles)
 	else:
 		await event.answer(balance_articles)
 
