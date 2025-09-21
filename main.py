@@ -128,9 +128,9 @@ async def get_short_history(user_requesting, other_user):
 		description = expense.description
 		amount = expense.amount
 		if description is None:
-			summary += f"{format_currency(amount)}" + "\n"
+			summary += f"{format_currency(amount)} [{expense.timestamp.strftime("%Y/%m/%d")}]" + "\n"
 		else:
-			summary += f"{format_currency(amount)} ({description})" + "\n"
+			summary += f"{format_currency(amount)} ({description}) [{expense.timestamp.strftime("%Y/%m/%d")}]" + "\n"
 	summary += "\n"
 
 	expenses_user_2 = (
@@ -150,9 +150,9 @@ async def get_short_history(user_requesting, other_user):
 		description = expense.description
 		amount = expense.amount
 		if description is None:
-			summary += f"{format_currency(amount)}" + "\n"
+			summary += f"{format_currency(amount)} [{expense.timestamp.strftime("%Y/%m/%d")}]" + "\n"
 		else:
-			summary += f"{format_currency(amount)} ({description})" + "\n"
+			summary += f"{format_currency(amount)} ({description}) [{expense.timestamp.strftime("%Y/%m/%d")}]" + "\n"
 
 	summary += "```"
 	return summary
