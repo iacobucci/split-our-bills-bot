@@ -1,5 +1,6 @@
 #!/bin/python3
 
+from decimal import Decimal, ROUND_HALF_UP
 import datetime
 
 from telethon import TelegramClient, events, Button
@@ -18,7 +19,7 @@ HALF_TABLE_LEN=20
 def log(message):
 	print(f"[{datetime.datetime.now()}] " + message)
 
-def add_expense(paying_user: int, other_user:int, amount:float, description=None):
+def add_expense(paying_user: int, other_user:int, amount:float, description=None, expense_type: str = "WHOLE"):
 	[user_1, user_2] = sorted([paying_user, other_user])
 
 	new_expense = Expense(
@@ -26,10 +27,26 @@ def add_expense(paying_user: int, other_user:int, amount:float, description=None
 		user_2=user_2,
 		paying_user=paying_user,
 		amount=amount,
-		description=description
+		description=description,
+		expense_type=expense_type
 	)
 	session.add(new_expense)
 	session.commit()
+
+def calculate_balance_text(user_1_name, user_2_name, user_1_total, user_2_total):
+	diff = round(user_1_total - user_2_total, 2)
+	if diff == 0:
+		return "All square!"
+
+	if diff > 0:
+		debtor_name = user_2_name
+		balance = diff
+	else:
+		debtor_name = user_1_name
+		balance = -diff
+
+	whole_amount = float((Decimal(str(balance)) / Decimal(2)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
+	return f"{debtor_name} should cover the next {format_currency(balance)} of SPLIT expenses or {format_currency(whole_amount)} of WHOLE expenses"
 
 async def get_balance(user_requesting, other_user):
 	[user_1, user_2] = sorted([user_requesting, other_user])
@@ -47,15 +64,7 @@ async def get_balance(user_requesting, other_user):
 		if expense.paying_user == user_2:
 			user_2_total += expense.amount
 	
-	if user_1_total > user_2_total:
-		balance = user_1_total - user_2_total
-		return user_2_name + " owes " + user_1_name + " " + format_currency(balance)
-	elif user_2_total > user_1_total:
-		balance = user_2_total - user_1_total
-		return user_1_name + " owes " + user_2_name + " " + format_currency(balance)
-	else:
-		balance = 0
-		return "All square!"
+	return calculate_balance_text(user_1_name, user_2_name, user_1_total, user_2_total)
 
 
 def format_currency(amount):
@@ -106,10 +115,17 @@ async def get_all_history(user_requesting, other_user):
 
 	return summary
 
+def format_history_expense(expense):
+	type_str = f" [{expense.expense_type}]" if expense.expense_type else ""
+	desc = expense.description
+	desc_str = f" ({desc})" if desc and desc != "None" else ""
+	date_str = expense.timestamp.strftime('%Y/%m/%d') if expense.timestamp else datetime.datetime.now().strftime('%Y/%m/%d')
+	return f"{format_currency(expense.amount)}{desc_str}{type_str} [{date_str}]"
+
 async def get_short_history(user_requesting, other_user):
 	[user_1, user_2] = sorted([user_requesting, other_user])
 
-	summary = "```"
+	summary = "```\n"
 
 	expenses_user_1 = (
 		session.query(Expense)
@@ -125,12 +141,7 @@ async def get_short_history(user_requesting, other_user):
 
 	summary += await get_user_label(user_1) + ":\n"
 	for expense in expenses_user_1:
-		description = expense.description
-		amount = expense.amount
-		if description is None:
-			summary += f"{format_currency(amount)} [{expense.timestamp.strftime('%Y/%m/%d')}]" + "\n"
-		else:
-			summary += f"{format_currency(amount)} ({description}) [{expense.timestamp.strftime('%Y/%m/%d')}]" + "\n"
+		summary += format_history_expense(expense) + "\n"
 	summary += "\n"
 
 	expenses_user_2 = (
@@ -147,12 +158,7 @@ async def get_short_history(user_requesting, other_user):
 
 	summary += await get_user_label(user_2) + ":\n"
 	for expense in expenses_user_2:
-		description = expense.description
-		amount = expense.amount
-		if description is None:
-			summary += f"{format_currency(amount)} [{expense.timestamp.strftime('%Y/%m/%d')}]" + "\n"
-		else:
-			summary += f"{format_currency(amount)} ({description}) [{expense.timestamp.strftime('%Y/%m/%d')}]" + "\n"
+		summary += format_history_expense(expense) + "\n"
 
 	summary += "```"
 	return summary
@@ -259,21 +265,32 @@ async def inline_handler(event):
 		)
 	
 	if amount > 0:
+		whole_prefix = f"add_exp:::WHOLE:::{amount}:::{user_id}:::"
+		avail_whole = max(0, 64 - len(whole_prefix.encode('utf-8')))
+		whole_desc = description[:avail_whole] if description else ""
+		whole_data = f"{whole_prefix}{whole_desc}"
+
+		split_amount = round(amount / 2, 2)
+		split_prefix = f"add_exp:::SPLIT:::{split_amount}:::{user_id}:::"
+		avail_split = max(0, 64 - len(split_prefix.encode('utf-8')))
+		split_desc = description[:avail_split] if description else ""
+		split_data = f"{split_prefix}{split_desc}"
+
 		add_expense_article = builder.article(
 			title="Add a WHOLE expense",
 			description=f"Click to add a WHOLE expense of {expense_amount_and_description(amount, description)}",
-			text=f"Adding new expense of {expense_amount_and_description(amount, description)}",
+			text=f"Adding new WHOLE expense of {expense_amount_and_description(amount, description)}",
 			buttons=[
-				Button.inline("Confirm", data=f"add_expense:::{amount}:::{user_id}:::{description}")
+				Button.inline("Confirm", data=whole_data)
 			]
 		)
 
 		add_split_expense_article = builder.article(
 			title="Add a SPLIT expense",
-			description=f"Click to add a SPLIT expense of {expense_amount_and_description(amount, description)}, thus adding {format_currency(amount/2)} to {other_user_label}'s debt.",
-			text=f"Adding new expense of {expense_amount_and_description(amount/2, description)}",
+			description=f"Click to add a SPLIT expense of {expense_amount_and_description(amount, description)}, thus adding {format_currency(split_amount)} to {other_user_label}'s debt.",
+			text=f"Adding new SPLIT expense of {expense_amount_and_description(split_amount, description)}",
 			buttons=[
-				Button.inline("Confirm", data=f"add_expense:::{amount/2}:::{user_id}:::{description}")
+				Button.inline("Confirm", data=split_data)
 			]
 		)
 
@@ -285,11 +302,17 @@ async def inline_handler(event):
 async def callback_handler(event):
 	data = event.data.decode('utf-8')
 	
-	if data.startswith("add_expense:::"):
-		# Estrai i dati dal callback
-		_, amount, user_id, description = data.split(":::")
+	if data.startswith("add_expense:::") or data.startswith("add_exp:::"):
+		parts = data.split(":::")
+		if len(parts) == 5:
+			_, expense_type, amount, user_id, description = parts
+		elif len(parts) == 4:
+			_, amount, user_id, description = parts
+			expense_type = "WHOLE"
+		else:
+			return
+
 		amount = float(amount)
-		# take just the first two decimals
 		amount = round(amount, 2)
 
 		user_id = int(user_id)
@@ -299,10 +322,12 @@ async def callback_handler(event):
 			await event.edit("😤 You must let the other person confirm your expense, you greedy!")
 			return
 
-		add_expense(paying_user=user_id, other_user=other_user_id, amount=amount, description=description)
+		if description in (None, "None", ""):
+			description = None
 
-		# Qui inserisci la logica per aggiungere la spesa
-		await event.edit(f"✅ Expense of {format_currency(amount)} added successfully!")
+		add_expense(paying_user=user_id, other_user=other_user_id, amount=amount, description=description, expense_type=expense_type)
+
+		await event.edit(f"✅ {expense_type} expense of {format_currency(amount)} added successfully!")
 		
 	elif data.startswith("all_history:::"):
 		# Estrai l'user_id
@@ -313,7 +338,7 @@ async def callback_handler(event):
 		balance = await get_balance(user_id, other_user_id)
 		history = await get_all_history(user_id, other_user_id)
 
-		summary = str(balance) + str(history)
+		summary = str(balance) + "\n" + str(history)
 		
 		await event.edit(summary)
 
@@ -326,7 +351,7 @@ async def callback_handler(event):
 		balance = await get_balance(user_id, other_user_id)
 		history = await get_short_history(user_id, other_user_id)
 
-		summary = str(balance) + str(history)
+		summary = str(balance) + "\n" + str(history)
 		
 		await event.edit(summary)
 
